@@ -692,8 +692,6 @@ def ga_environment_variables()
         :version => nil
       },
       :spreadsheet => nil,
-      :cron_generate => nil,
-      :cron_status => nil,
       :debug => nil,
     }
   }
@@ -723,10 +721,6 @@ def ga_environment_variables()
         params[:data][:aws][:version] = value
       when "SPREADSHEET"
         params[:data][:spreadsheet] = value 
-      when "CRON_GENERATE"
-        params[:data][:cron_generate] = value
-      when "CRON_STATUS"
-        params[:data][:cron_status] = value
       when "DEBUG"
         params[:data][:debug] = JSON.parse( value )
     else
@@ -811,11 +805,11 @@ stats = {
   :error => 0
 }
 
-begin
+# begin
   ga_start( params )
   stats[:success] = stats[:success] + 1
-rescue
+# rescue
   stats[:error] = stats[:error] + 1
-end
+# end
 
 puts stats  
