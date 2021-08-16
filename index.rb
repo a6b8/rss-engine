@@ -10,7 +10,6 @@ require 'cgi'
 require 'date'
 require "rss"
 require 'aws-sdk'
-require 'slack/incoming/webhooks'
 require 'opml-parser'
 include OpmlParser
 
@@ -604,16 +603,6 @@ def ga_opml_start( obj, debug )
 end
 
 
-def ga_slack_start( cmd, debug )
-  slack_url = "https://hooks.slack.com/services/"
-  slack_url += cmd[:id]
-
-  slack = Slack::Incoming::Webhooks.new slack_url
-  slack.post cmd[:message]
-  return true
-end
-
-
 def ga_zip_start( obj, debug )
   item = {
     :path => {
@@ -702,12 +691,10 @@ def ga_environment_variables()
         :bucket_name => nil,
         :version => nil
       },
-      :slack => nil,
       :spreadsheet => nil,
       :cron_generate => nil,
       :cron_status => nil,
       :debug => nil,
-      :stage => nil
     }
   }
 
@@ -734,8 +721,6 @@ def ga_environment_variables()
         params[:data][:aws][:bucket_name] = value
       when "AWS_VERSION"
         params[:data][:aws][:version] = value
-      when "SLACK"
-        params[:data][:slack] = value
       when "SPREADSHEET"
         params[:data][:spreadsheet] = value 
       when "CRON_GENERATE"
@@ -744,8 +729,6 @@ def ga_environment_variables()
         params[:data][:cron_status] = value
       when "DEBUG"
         params[:data][:debug] = JSON.parse( value )
-      when "STAGE"
-        params[:data][:stage] = value.downcase
     else
     end
   end
@@ -778,7 +761,6 @@ def ga_start( params )
         :row => 13,
         :column => 1
       },
-      :slack => params[:data][:slack],
       :aws => {
         :id => params[:data][:aws][:id],
         :secret => params[:data][:aws][:secret],
@@ -818,54 +800,22 @@ def ga_start( params )
   hash[:opml][:feeds][:status] += hash[:opml][:status].join("\n")
   hash[:opml][:feeds][:status] += "\n"
   hash[:opml][:feeds][:status] += ga_zip_start( hash, debug )
-
-  if debug
-    cmd = {
-      :id=> hash[:meta][:slack],
-      :message => hash[:opml][:feeds][:status]
-    }
-    ga_slack_start( cmd, debug )
-  end
 end 
 
-scheduler = Rufus::Scheduler.new
+
 params = ga_environment_variables()
+puts params
 
 stats = {
   :success => 0,
   :error => 0
 }
 
-if params[:data][:stage] == "production"
-
-  if params[:data][:debug]
-    puts "Initialize"
-  end
-
-  scheduler.cron params[:data][:cron_status] do
-    cmd = {
-      :id => params[:data][:slack],
-      :message => "*STATUS: * Success " + stats[:success].to_s + " | Error " + stats[:error].to_s
-    }
-    ga_slack_start( cmd, params[:data][:debug] )
-    stats = {
-      :success => 0,
-      :error => 0
-    }
-  end
-
-  scheduler.cron params[:data][:cron_generate] do
-    begin
-      ga_start( params )
-      stats[:success] = stats[:success] + 1
-    rescue
-      stats[:error] = stats[:error] + 1
-    end
-  end
-else
+begin
   ga_start( params )
+  stats[:success] = stats[:success] + 1
+rescue
+  stats[:error] = stats[:error] + 1
 end
 
-
-
-scheduler.join
+puts stats  
